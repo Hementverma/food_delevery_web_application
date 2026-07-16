@@ -18,6 +18,7 @@ dotenv.config();
 const app = express();
 const server = http.createServer(app);
 
+// Allowed Origins
 const allowedOrigins = [
   "http://localhost:5173",
   "http://localhost:5174",
@@ -26,21 +27,35 @@ const allowedOrigins = [
   process.env.FRONTEND_URL,
 ].filter(Boolean);
 
+console.log("Allowed Origins:", allowedOrigins);
+
+// Socket.IO
 const io = new Server(server, {
   cors: {
     origin: allowedOrigins,
     credentials: true,
-    methods: ["GET", "POST"],
+    methods: ["GET", "POST", "PUT", "DELETE"],
   },
 });
 
 app.set("io", io);
 
-// Middlewares
+// CORS Middleware
 app.use(
   cors({
-    origin: allowedOrigins,
+    origin: (origin, callback) => {
+      // Postman ya server-to-server requests ke liye
+      if (!origin) return callback(null, true);
+
+      if (allowedOrigins.includes(origin)) {
+        return callback(null, true);
+      }
+
+      return callback(new Error(`CORS Error: ${origin} is not allowed`));
+    },
     credentials: true,
+    methods: ["GET", "POST", "PUT", "DELETE"],
+    allowedHeaders: ["Content-Type", "Authorization"],
   })
 );
 
@@ -63,10 +78,9 @@ app.use("/api/order", orderRouter);
 // Socket
 socketHandler(io);
 
-// Port
+// Start Server
 const port = process.env.PORT || 5000;
 
-// Start Server
 server.listen(port, async () => {
   await connectDb();
   console.log(`🚀 Server started at port ${port}`);
